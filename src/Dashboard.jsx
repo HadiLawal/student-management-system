@@ -63,12 +63,23 @@ const Dashboard = () => {
 
   // Enrollment by course
   const enrollmentByCourse = courses.map((course) => {
-    const enrolledStudents = students.filter(
-      (student) =>
-        String(student.course).toLowerCase() ===
+    const enrolledStudents = students.filter((student) => {
+      // New student records use courseId
+      if (
+        student.courseId !== undefined &&
+        student.courseId !== null &&
+        student.courseId !== ""
+      ) {
+        return String(student.courseId) === String(course.id);
+      }
+
+      // Support older student records that used course
+      return (
+        String(student.course || "").toLowerCase() ===
           String(course.name).toLowerCase() ||
-        String(student.course) === String(course.id)
-    ).length;
+        String(student.course || "") === String(course.id)
+      );
+    }).length;
 
     return {
       name: course.name,
@@ -375,7 +386,10 @@ const Dashboard = () => {
                       </td>
 
                       <td className="py-4 text-sm text-slate-500">
-                        {student.course || "Not assigned"}
+                        {courses.find(
+                          (course) =>
+                            String(course.id) === String(student.courseId)
+                        )?.name || student.course || "Not assigned"}
                       </td>
 
                       <td className="py-4">
@@ -454,9 +468,13 @@ const Dashboard = () => {
                 </h4>
 
                 <p className="mt-1 text-xs text-slate-400">
-                  {Math.max(students.length - new Set(
-                    results.map((result) => String(result.studentId))
-                  ).size, 0)} students
+                  {Math.max(
+                    students.length -
+                      new Set(
+                        results.map((result) => String(result.studentId))
+                      ).size,
+                    0
+                  )} students
                 </p>
               </div>
             </div>

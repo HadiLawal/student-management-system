@@ -12,10 +12,11 @@ import {
 import { useData } from "./context/DataContext";
 
 const Students = () => {
-  // Shared student data
+  // Shared data
   const {
     students,
     setStudents,
+    courses,
     results,
     setResults,
     attendance,
@@ -32,12 +33,28 @@ const Students = () => {
     name: "",
     email: "",
     studentId: "",
-    course: "",
+    courseId: "",
     status: "Active",
   };
 
   const [formData, setFormData] = useState(initialFormData);
   const [error, setError] = useState("");
+
+  // Get a student's course
+  // Supports both new courseId records and older course-name records
+  const getStudentCourse = (student) => {
+    if (student.courseId !== undefined && student.courseId !== null) {
+      return courses.find(
+        (course) => String(course.id) === String(student.courseId)
+      );
+    }
+
+    return courses.find(
+      (course) =>
+        course.name.toLowerCase() ===
+        (student.course || "").toLowerCase()
+    );
+  };
 
   // Reset form
   const resetForm = () => {
@@ -51,17 +68,29 @@ const Students = () => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
+    // Find the selected course
+    const selectedCourse = courses.find(
+      (course) => String(course.id) === String(formData.courseId)
+    );
+
+    if (!selectedCourse) {
+      setError("Please select an available course.");
+      return;
+    }
+
+    // Check duplicate student ID
     const studentIdExists = students.some(
       (student) =>
         student.studentId.toLowerCase() ===
-        formData.studentId.trim().toLowerCase() &&
+          formData.studentId.trim().toLowerCase() &&
         student.id !== editingStudent
     );
 
+    // Check duplicate email
     const emailExists = students.some(
       (student) =>
         student.email.toLowerCase() ===
-        formData.email.trim().toLowerCase() &&
+          formData.email.trim().toLowerCase() &&
         student.id !== editingStudent
     );
 
@@ -75,29 +104,32 @@ const Students = () => {
       return;
     }
 
+    // Prepare student data
+    const studentData = {
+      name: formData.name.trim(),
+      email: formData.email.trim(),
+      studentId: formData.studentId.trim(),
+      courseId: selectedCourse.id,
+      status: formData.status,
+    };
+
     if (editingStudent !== null) {
+      // Update existing student
       setStudents((prevStudents) =>
         prevStudents.map((student) =>
           student.id === editingStudent
             ? {
-              ...student,
-              ...formData,
-              name: formData.name.trim(),
-              email: formData.email.trim(),
-              studentId: formData.studentId.trim(),
-              course: formData.course.trim(),
-            }
+                ...student,
+                ...studentData,
+              }
             : student
         )
       );
     } else {
+      // Register new student
       const newStudent = {
         id: Date.now(),
-        ...formData,
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        studentId: formData.studentId.trim(),
-        course: formData.course.trim(),
+        ...studentData,
       };
 
       setStudents((prevStudents) => [
@@ -111,11 +143,13 @@ const Students = () => {
 
   // Open edit form
   const handleEdit = (student) => {
+    const studentCourse = getStudentCourse(student);
+
     setFormData({
       name: student.name,
       email: student.email,
       studentId: student.studentId,
-      course: student.course,
+      courseId: studentCourse ? String(studentCourse.id) : "",
       status: student.status,
     });
 
@@ -144,7 +178,6 @@ const Students = () => {
       )
     );
 
-    // Delete the student's attendance records
     // Delete the student's attendance records
     setAttendance((prevAttendance) =>
       prevAttendance
@@ -195,12 +228,19 @@ const Students = () => {
   // Search and filter students
   const filteredStudents = students.filter((student) => {
     const search = searchTerm.toLowerCase();
+    const studentCourse = getStudentCourse(student);
+
+    const courseName =
+      studentCourse?.name || student.course || "";
+
+    const courseCode = studentCourse?.code || "";
 
     const matchesSearch =
       student.name.toLowerCase().includes(search) ||
       student.email.toLowerCase().includes(search) ||
       student.studentId.toLowerCase().includes(search) ||
-      student.course.toLowerCase().includes(search);
+      courseName.toLowerCase().includes(search) ||
+      courseCode.toLowerCase().includes(search);
 
     const matchesStatus =
       statusFilter === "All" ||
@@ -346,25 +386,44 @@ const Students = () => {
               />
             </div>
 
-            {/* COURSE */}
+            {/* COURSE SELECTION */}
             <div>
               <label className="mb-2 block text-sm font-medium text-slate-600">
-                Course
+                Select Course
               </label>
 
-              <input
-                type="text"
-                placeholder="Enter course"
-                value={formData.course}
+              <select
+                value={formData.courseId}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    course: e.target.value,
+                    courseId: e.target.value,
                   })
                 }
-                className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-emerald-600"
+                className="w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none focus:border-emerald-600"
                 required
-              />
+              >
+                <option value="">
+                  {courses.length === 0
+                    ? "No courses available"
+                    : "Choose a course"}
+                </option>
+
+                {courses.map((course) => (
+                  <option
+                    key={course.id}
+                    value={course.id}
+                  >
+                    {course.name} ({course.code})
+                  </option>
+                ))}
+              </select>
+
+              {courses.length === 0 && (
+                <p className="mt-2 text-xs text-red-500">
+                  Please create a course on the Courses page before registering a student.
+                </p>
+              )}
             </div>
 
             {/* STATUS */}
@@ -393,7 +452,8 @@ const Students = () => {
             <div className="flex items-end gap-3">
               <button
                 type="submit"
-                className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800"
+                disabled={courses.length === 0}
+                className="rounded-xl bg-emerald-700 px-5 py-3 text-sm font-semibold text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {editingStudent !== null
                   ? "Update Student"
@@ -525,62 +585,76 @@ const Students = () => {
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => (
-                  <tr
-                    key={student.id}
-                    className="border-b border-slate-50 last:border-0"
-                  >
+                filteredStudents.map((student) => {
+                  const studentCourse = getStudentCourse(student);
 
-                    <td className="p-4">
-                      <p className="text-sm font-semibold text-slate-700">
-                        {student.name}
-                      </p>
+                  return (
+                    <tr
+                      key={student.id}
+                      className="border-b border-slate-50 last:border-0"
+                    >
 
-                      <p className="mt-1 text-xs text-slate-400">
-                        {student.email}
-                      </p>
-                    </td>
+                      <td className="p-4">
+                        <p className="text-sm font-semibold text-slate-700">
+                          {student.name}
+                        </p>
 
-                    <td className="p-4 text-sm text-slate-500">
-                      {student.studentId}
-                    </td>
+                        <p className="mt-1 text-xs text-slate-400">
+                          {student.email}
+                        </p>
+                      </td>
 
-                    <td className="p-4 text-sm text-slate-500">
-                      {student.course}
-                    </td>
+                      <td className="p-4 text-sm text-slate-500">
+                        {student.studentId}
+                      </td>
 
-                    <td className="p-4">
-                      <span
-                        className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(student.status)}`}
-                      >
-                        {student.status}
-                      </span>
-                    </td>
+                      <td className="p-4">
+                        <p className="text-sm text-slate-600">
+                          {studentCourse?.name ||
+                            student.course ||
+                            "Course unavailable"}
+                        </p>
 
-                    <td className="p-4">
-                      <div className="flex items-center gap-2">
+                        {studentCourse?.code && (
+                          <p className="mt-1 text-xs text-slate-400">
+                            {studentCourse.code}
+                          </p>
+                        )}
+                      </td>
 
-                        <button
-                          onClick={() => handleEdit(student)}
-                          title="Edit student"
-                          className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
+                      <td className="p-4">
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${getStatusStyle(student.status)}`}
                         >
-                          <Pencil size={17} />
-                        </button>
+                          {student.status}
+                        </span>
+                      </td>
 
-                        <button
-                          onClick={() => handleDelete(student.id)}
-                          title="Delete student"
-                          className="rounded-lg p-2 text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 size={17} />
-                        </button>
+                      <td className="p-4">
+                        <div className="flex items-center gap-2">
 
-                      </div>
-                    </td>
+                          <button
+                            onClick={() => handleEdit(student)}
+                            title="Edit student"
+                            className="rounded-lg p-2 text-blue-600 hover:bg-blue-50"
+                          >
+                            <Pencil size={17} />
+                          </button>
 
-                  </tr>
-                ))
+                          <button
+                            onClick={() => handleDelete(student.id)}
+                            title="Delete student"
+                            className="rounded-lg p-2 text-red-600 hover:bg-red-50"
+                          >
+                            <Trash2 size={17} />
+                          </button>
+
+                        </div>
+                      </td>
+
+                    </tr>
+                  );
+                })
               )}
 
             </tbody>

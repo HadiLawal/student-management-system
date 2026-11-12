@@ -187,17 +187,6 @@ const DashboardLayout = () => {
               {darkMode ? <Sun size={21} /> : <Moon size={21} />}
             </button>
 
-            {/* SEARCH */}
-            <div className="hidden items-center gap-2 rounded-xl bg-slate-100 px-4 py-2.5 md:flex">
-              <Search size={18} className="text-slate-400" />
-
-              <input
-                type="text"
-                placeholder="Search anything..."
-                className="w-36 bg-transparent text-sm outline-none lg:w-48"
-              />
-            </div>
-
             {/* NOTIFICATIONS */}
             <button className="relative rounded-xl p-2.5 text-slate-600 hover:bg-slate-100">
               <Bell size={21} />
